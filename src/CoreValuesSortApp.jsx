@@ -1,0 +1,967 @@
+import React, { useEffect, useRef, useState } from "react";
+
+// ─── DATA ─────────────────────────────────────────────────────────────────────
+const ALL_VALUES = [
+  "Acceptance","Accomplishment","Accountability","Accuracy","Achievement","Adaptability","Alertness","Altruism","Ambition","Amusement","Assertiveness","Attentive","Awareness","Balance","Beauty","Boldness","Bravery","Brilliance","Calm","Candor","Capable","Careful","Certainty","Challenge","Charity","Cleanliness","Clear","Clever","Comfort","Commitment","Common sense","Communication","Community","Compassion","Competence","Concentration","Confidence","Connection","Consciousness","Consistency","Contentment","Contribution","Control","Conviction","Cooperation",
+  "Courage","Courtesy","Creation","Creativity","Credibility","Curiosity","Decisive","Decisiveness","Dedication","Dependability","Determination","Development","Devotion","Dignity","Discipline","Discovery","Drive","Effectiveness","Efficiency","Empathy","Empower","Endurance","Energy","Enjoyment","Enthusiasm","Equality","Ethical","Excellence","Experience","Exploration","Expressive","Fairness","Family","Famous","Fearless","Feelings","Ferocious","Fidelity","Focus","Foresight","Fortitude","Freedom","Friendship","Fun","Generosity",
+  "Genius","Giving","Goodness","Grace","Gratitude","Greatness","Growth","Happiness","Hard work","Harmony","Health","Honesty","Honor","Hope","Humility","Imagination","Improvement","Independence","Individuality","Innovation","Inquisitive","Insightful","Inspiring","Integrity","Intelligence","Intensity","Intuitive","Irreverent","Joy","Justice","Kindness","Knowledge","Lawful","Leadership","Learning","Liberty","Logic","Love","Loyalty","Mastery","Maturity","Meaning","Moderation","Motivation","Openness",
+  "Optimism","Order","Organization","Originality","Passion","Patience","Peace","Performance","Persistence","Playfulness","Poise","Potential","Power","Present","Productivity","Professionalism","Prosperity","Purpose","Quality","Realistic","Reason","Recognition","Recreation","Reflective","Respect","Responsibility","Restraint","Results-oriented","Reverence","Rigor","Risk","Satisfaction","Security","Self-reliance","Selfless","Sensitivity","Serenity","Service","Sharing","Significance","Silence","Simplicity","Sincerity","Skill","Skillfulness",
+  "Smart","Solitude","Spirit","Spirituality","Spontaneous","Stability","Status","Stewardship","Strength","Structure","Success","Support","Surprise","Sustainability","Talent","Teamwork","Temperance","Thankful","Thorough","Thoughtful","Timeliness","Tolerance","Toughness","Tradition","Tranquility","Transparency","Trust","Trustworthy","Truth","Understanding","Uniqueness","Unity","Valor","Victory","Vigor","Vision","Vitality","Wealth","Welcoming","Winning","Wisdom","Wonder",
+];
+
+const STAGES = {
+  intro: "intro",
+  sort: "sort",
+  halftime: "halftime",
+  narrowHalf: "narrowHalf",
+  topTenIntro: "topTenIntro",
+  topTen: "topTen",
+  rankIntro: "rankIntro",
+  rank: "rank",
+  narrativeIntro: "narrativeIntro",
+  narrative: "narrative",
+};
+
+// ─── UTILITIES ────────────────────────────────────────────────────────────────
+function shuffleArray(arr) {
+  const a = [...arr];
+  for (let i = a.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [a[i], a[j]] = [a[j], a[i]];
+  }
+  return a;
+}
+
+// ─── AI ───────────────────────────────────────────────────────────────────────
+async function generateAINarrative(name, values, apiKey) {
+  const valuesText = values.map((v, i) => `${i + 1}. ${v}`).join("\n");
+  const prompt = `You are writing a heartfelt first-person narrative statement for someone named ${name} who has just completed a meaningful self-reflection exercise about their core values. They are on a personal journey of growth and recovery.
+
+Their top 10 core values in ranked order are:
+${valuesText}
+
+Write a flowing narrative in first person as if ${name} is speaking directly. Begin exactly with: "My name is ${name}. My top core value is ${values[0]}."
+
+Then naturally weave through all 10 values — not listing them robotically, but letting them emerge organically as a portrait of who this person is. The tone should be warm, grounded, and quietly powerful. Write as if this person is explaining to someone important who they are and what they stand for. End with one quiet, strong sentence that ties their whole identity together.
+
+About 200–240 words. No bullet points, no headers — just flowing first-person prose.`;
+
+  const res = await fetch("https://api.openai.com/v1/chat/completions", {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${apiKey}`,
+    },
+    body: JSON.stringify({
+      model: "gpt-4o-mini",
+      messages: [{ role: "user", content: prompt }],
+      temperature: 0.72,
+      max_tokens: 600,
+    }),
+  });
+
+  if (!res.ok) {
+    const body = await res.json().catch(() => ({}));
+    throw new Error(body?.error?.message || `API error ${res.status}`);
+  }
+  const data = await res.json();
+  return (data.choices?.[0]?.message?.content ?? "").trim();
+}
+
+function buildFallbackNarrative(name, values) {
+  if (!values.length) return "";
+  return (
+    `My name is ${name}. My top core value is ${values[0].toLowerCase()}. ` +
+    values.map((v) => `I value ${v.toLowerCase()}.`).join(" ") +
+    " These are not random words. They are an honest map of who I am and the life I am building."
+  );
+}
+
+function buildProcessReflection(name) {
+  return `${name || "You"}, turn your music off for a moment. What you just did was not small. You moved through ${ALL_VALUES.length} core values and sorted them — keeping what felt true, letting go of what did not. Then you narrowed them down twice, until only ten remained. Then you placed those ten in order, from your number one core value to your number ten. These are not a random collection of nice words. You just completed a thorough examination of yourself. You paid attention, made real distinctions, and listened for what was true. The values in front of you are not accidental. They are an honest map of who you are. Now read your statement out loud, like you are telling someone who you are and what you stand for.`;
+}
+
+// ─── PDF ─────────────────────────────────────────────────────────────────────
+function downloadPdfLikeHtml({ name, orderedTopTen, narrative, processReflection }) {
+  const safeName = (name || "core-values-reflection")
+    .replace(/[^a-z0-9]+/gi, "-")
+    .replace(/^-|-$/g, "")
+    .toLowerCase();
+
+  const html = `<!doctype html>
+<html><head><meta charset="utf-8" />
+<title>Core Values Reflection — ${name}</title>
+<style>
+body { font-family: Georgia, serif; color: #1f2937; padding: 40px; line-height: 1.7; }
+h1 { font-size: 26px; margin-bottom: 6px; }
+h2 { font-size: 13px; letter-spacing: 0.2em; text-transform: uppercase; color: #b45309; margin-top: 32px; }
+.box { border: 1px solid #e5e7eb; border-radius: 16px; padding: 20px; background: #fafafa; }
+.chip { display: inline-block; border: 1px solid #d1d5db; border-radius: 999px; padding: 5px 12px; margin: 0 6px 6px 0; font-size: 13px; }
+ol { padding-left: 22px; }
+</style>
+</head><body>
+  <h1>My name is ${name}.</h1>
+  <div class="box">${narrative.split("\n").filter(Boolean).map((p) => `<p>${p}</p>`).join("")}</div>
+  <h2>Final Reflection</h2>
+  <div>${orderedTopTen.map((v, i) => `<span class="chip">#${i + 1} ${v}</span>`).join("")}</div>
+  <h2>What I Just Did</h2>
+  <div class="box">${processReflection}</div>
+  <h2>Ranked Values</h2>
+  <ol>${orderedTopTen.map((v, i) => `<li>${i + 1}. ${v}</li>`).join("")}</ol>
+  <script>window.onload = () => window.print();</script>
+</body></html>`;
+
+  const blob = new Blob([html], { type: "text/html" });
+  const url = URL.createObjectURL(blob);
+  const win = window.open(url, "_blank");
+  if (!win) {
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `${safeName || "core-values-reflection"}.html`;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+  }
+  setTimeout(() => URL.revokeObjectURL(url), 15000);
+}
+
+// ─── FADE-IN WORDS ────────────────────────────────────────────────────────────
+// Words emerge one by one like a calm voice rising from silence.
+function FadeInWords({ text, msPerWord = 80 }) {
+  const words = text.split(" ");
+  const [revealed, setRevealed] = useState(0);
+
+  useEffect(() => {
+    setRevealed(0);
+    const timers = words.map((_, i) =>
+      setTimeout(() => setRevealed(i + 1), i * msPerWord)
+    );
+    return () => timers.forEach(clearTimeout);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [text]);
+
+  return (
+    <span>
+      {words.map((word, i) => (
+        <React.Fragment key={i}>
+          <span
+            style={{
+              opacity: i < revealed ? 1 : 0,
+              transition: "opacity 850ms ease",
+              display: "inline",
+            }}
+          >
+            {word}
+          </span>
+          {i < words.length - 1 ? " " : ""}
+        </React.Fragment>
+      ))}
+    </span>
+  );
+}
+
+// ─── DESIGN TOKENS ────────────────────────────────────────────────────────────
+// Deep ocean midnight — evokes introspection, depth, stillness.
+// Gold — worth, value, the light inside each person.
+// Teal — healing, clarity, moving forward.
+const C = {
+  bg: "linear-gradient(160deg, #060c1a 0%, #0b1d35 55%, #060c1a 100%)",
+  card: "rgba(255,255,255,0.045)",
+  cardBorder: "rgba(255,255,255,0.09)",
+  shadow: "0 24px 64px rgba(0,0,0,0.55)",
+  gold: "#d4a847",
+  goldLight: "#e6c060",
+  goldBg: "rgba(212,168,71,0.10)",
+  goldBorder: "rgba(212,168,71,0.28)",
+  teal: "#5dd4b8",
+  tealBg: "rgba(93,212,184,0.09)",
+  tealBorder: "rgba(93,212,184,0.28)",
+  textPrimary: "#e8f0f7",
+  textSecondary: "#7ea8c4",
+  textMuted: "#3e6175",
+};
+
+// ─── COMPONENTS ───────────────────────────────────────────────────────────────
+function StageCard({ children, wide = false, glow = false }) {
+  return (
+    <div
+      style={{
+        background: C.card,
+        border: `1px solid ${C.cardBorder}`,
+        borderRadius: 32,
+        boxShadow: glow
+          ? `${C.shadow}, 0 0 120px rgba(93,212,184,0.055)`
+          : C.shadow,
+        backdropFilter: "blur(24px)",
+        WebkitBackdropFilter: "blur(24px)",
+        padding: 34,
+        maxWidth: wide ? 1100 : 860,
+        margin: "0 auto",
+      }}
+    >
+      {children}
+    </div>
+  );
+}
+
+function Btn({ children, onClick, disabled = false, ghost = false, style = {} }) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      disabled={disabled}
+      style={{
+        border: disabled
+          ? "1px solid rgba(255,255,255,0.07)"
+          : ghost
+          ? "1px solid rgba(255,255,255,0.14)"
+          : "1px solid transparent",
+        background: disabled
+          ? "rgba(255,255,255,0.04)"
+          : ghost
+          ? "rgba(255,255,255,0.04)"
+          : `linear-gradient(135deg, ${C.gold} 0%, ${C.goldLight} 100%)`,
+        color: disabled ? C.textMuted : ghost ? C.textSecondary : "#07101e",
+        padding: "13px 22px",
+        borderRadius: 18,
+        fontSize: 15,
+        fontWeight: 600,
+        cursor: disabled ? "not-allowed" : "pointer",
+        letterSpacing: "0.01em",
+        transition: "all 0.18s ease",
+        fontFamily: "inherit",
+        ...style,
+      }}
+    >
+      {children}
+    </button>
+  );
+}
+
+function Pill({ label, active, onClick }) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      style={{
+        border: active ? `1px solid ${C.teal}` : "1px solid rgba(255,255,255,0.10)",
+        background: active ? C.tealBg : "rgba(255,255,255,0.025)",
+        color: active ? C.teal : C.textSecondary,
+        borderRadius: 999,
+        padding: "9px 17px",
+        cursor: "pointer",
+        fontSize: 14,
+        fontWeight: active ? 600 : 400,
+        transition: "all 0.16s ease",
+        letterSpacing: "0.01em",
+        fontFamily: "inherit",
+      }}
+    >
+      {label}
+    </button>
+  );
+}
+
+function ProgressBar({ value }) {
+  return (
+    <div style={{ background: "rgba(255,255,255,0.05)", borderRadius: 999, height: 6, overflow: "hidden" }}>
+      <div
+        style={{
+          width: `${Math.max(0, Math.min(100, value))}%`,
+          background: `linear-gradient(90deg, ${C.teal}, ${C.gold})`,
+          height: "100%",
+          borderRadius: 999,
+          transition: "width 0.3s ease",
+        }}
+      />
+    </div>
+  );
+}
+
+function DotLoader({ label = "Creating your statement…" }) {
+  return (
+    <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+      {[0, 1, 2].map((i) => (
+        <div
+          key={i}
+          style={{
+            width: 8,
+            height: 8,
+            borderRadius: "50%",
+            background: C.teal,
+            animation: `cvPulseDot 1.4s ease-in-out ${i * 0.22}s infinite`,
+          }}
+        />
+      ))}
+      <span style={{ color: C.textSecondary, fontSize: 14, marginLeft: 4 }}>{label}</span>
+    </div>
+  );
+}
+
+// ─── MAIN APP ─────────────────────────────────────────────────────────────────
+export default function CoreValuesSortApp() {
+  const [name, setName] = useState("");
+  const [music, setMusic] = useState("");
+  const [stage, setStage] = useState(STAGES.intro);
+  const [deck, setDeck] = useState(() => shuffleArray(ALL_VALUES));
+  const [sortIndex, setSortIndex] = useState(0);
+  const [havePile, setHavePile] = useState([]);
+  const [notPile, setNotPile] = useState([]);
+  const [halfSelections, setHalfSelections] = useState([]);
+  const [topTenSelections, setTopTenSelections] = useState([]);
+  const [orderedTopTen, setOrderedTopTen] = useState([]);
+  const [counselorMode, setCounselorMode] = useState(false);
+  const [tapCount, setTapCount] = useState(0);
+  const dragIndexRef = useRef(null);
+
+  // AI narrative state
+  const [apiKey, setApiKey] = useState(() => localStorage.getItem("cv_oai_key") || "");
+  const [aiNarrative, setAiNarrative] = useState("");
+  const [generating, setGenerating] = useState(false);
+  const [genError, setGenError] = useState("");
+  const [showKeyInput, setShowKeyInput] = useState(false);
+
+  // Derived
+  const currentValue = deck[sortIndex];
+  const sortProgress = Math.round((sortIndex / deck.length) * 100);
+  const halfTarget = Math.max(1, Math.ceil(havePile.length / 2));
+  const canStart = name.trim() !== "" && music.trim() !== "";
+  const processReflection = buildProcessReflection(name);
+
+  // Persist API key
+  useEffect(() => {
+    if (apiKey) localStorage.setItem("cv_oai_key", apiKey);
+  }, [apiKey]);
+
+  // Inject global styles once
+  useEffect(() => {
+    const id = "cv-global-style";
+    if (document.getElementById(id)) return;
+    const s = document.createElement("style");
+    s.id = id;
+    s.textContent = `
+      *, *::before, *::after { box-sizing: border-box; }
+      body {
+        margin: 0;
+        font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, sans-serif;
+        background: ${C.bg};
+        background-attachment: fixed;
+        color: ${C.textPrimary};
+        min-height: 100vh;
+      }
+      input, textarea {
+        width: 100%;
+        padding: 13px 15px;
+        border-radius: 14px;
+        border: 1px solid rgba(255,255,255,0.12);
+        font-size: 15px;
+        background: rgba(255,255,255,0.05);
+        color: ${C.textPrimary};
+        font-family: inherit;
+      }
+      input::placeholder, textarea::placeholder { color: ${C.textMuted}; }
+      input:focus, textarea:focus {
+        outline: none;
+        border-color: ${C.teal};
+        box-shadow: 0 0 0 3px rgba(93,212,184,0.12);
+      }
+      .cv-grid { display: grid; gap: 16px; }
+      .cv-wrap { display: flex; flex-wrap: wrap; gap: 8px; }
+      .cv-rank-card.dragging { opacity: 0.4; transform: scale(0.97); }
+      @keyframes cvPulseDot {
+        0%, 80%, 100% { transform: scale(0.7); opacity: 0.35; }
+        40%            { transform: scale(1.15); opacity: 1; }
+      }
+      @media (max-width: 800px) {
+        .cv-two { grid-template-columns: 1fr !important; }
+      }
+    `;
+    document.head.appendChild(s);
+  }, []);
+
+  // Auto-start AI generation the moment user enters the narrativeIntro screen
+  useEffect(() => {
+    if (stage !== STAGES.narrativeIntro) return;
+    if (!orderedTopTen.length) return;
+
+    let cancelled = false;
+    setGenError("");
+    setAiNarrative("");
+
+    if (!apiKey.trim()) {
+      setAiNarrative(buildFallbackNarrative(name, orderedTopTen));
+      return;
+    }
+
+    setGenerating(true);
+    generateAINarrative(name, orderedTopTen, apiKey)
+      .then((narrative) => {
+        if (!cancelled) {
+          setAiNarrative(narrative);
+          setGenerating(false);
+        }
+      })
+      .catch((err) => {
+        if (!cancelled) {
+          setGenError(err.message);
+          setAiNarrative(buildFallbackNarrative(name, orderedTopTen));
+          setGenerating(false);
+        }
+      });
+
+    return () => { cancelled = true; };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [stage]);
+
+  // ── ACTIONS ────────────────────────────────────────────────────────────────
+  function resetAll() {
+    setDeck(shuffleArray(ALL_VALUES));
+    setSortIndex(0);
+    setHavePile([]);
+    setNotPile([]);
+    setHalfSelections([]);
+    setTopTenSelections([]);
+    setOrderedTopTen([]);
+    setAiNarrative("");
+    setGenError("");
+    setGenerating(false);
+    setStage(STAGES.intro);
+  }
+
+  // ── Hidden developer mode: tap header label 5 times to toggle ─────────────
+  function handleSecretTap() {
+    const next = tapCount + 1;
+    if (next >= 5) {
+      setCounselorMode((p) => !p);
+      setTapCount(0);
+      return;
+    }
+    setTapCount(next);
+  }
+
+  function choosePile(which) {
+    if (!currentValue) return;
+    if (which === "have") setHavePile((p) => [...p, currentValue]);
+    else setNotPile((p) => [...p, currentValue]);
+    if (sortIndex + 1 >= deck.length) {
+      setSortIndex((n) => n + 1);
+      setStage(STAGES.halftime);
+    } else {
+      setSortIndex((n) => n + 1);
+    }
+  }
+
+  function toggleHalf(v) {
+    setHalfSelections((prev) => {
+      if (prev.includes(v)) return prev.filter((x) => x !== v);
+      if (prev.length >= halfTarget) return prev;
+      return [...prev, v];
+    });
+  }
+
+  function toggleTopTen(v) {
+    setTopTenSelections((prev) => {
+      if (prev.includes(v)) return prev.filter((x) => x !== v);
+      if (prev.length >= 10) return prev;
+      return [...prev, v];
+    });
+  }
+
+  function moveRank(idx, dir) {
+    const next = [...orderedTopTen];
+    const swap = dir === "up" ? idx - 1 : idx + 1;
+    if (swap < 0 || swap >= next.length) return;
+    [next[idx], next[swap]] = [next[swap], next[idx]];
+    setOrderedTopTen(next);
+  }
+
+  function onDragStart(idx, e) {
+    dragIndexRef.current = idx;
+    e?.currentTarget?.classList.add("dragging");
+  }
+
+  function onDragEnd(e) {
+    dragIndexRef.current = null;
+    e?.currentTarget?.classList.remove("dragging");
+  }
+
+  function onDrop(dropIdx) {
+    const from = dragIndexRef.current;
+    if (from == null || from === dropIdx) return;
+    const next = [...orderedTopTen];
+    const [moved] = next.splice(from, 1);
+    next.splice(dropIdx, 0, moved);
+    setOrderedTopTen(next);
+    dragIndexRef.current = null;
+  }
+
+  // Developer skip helpers — preserved intact
+  function skipToHalf() {
+    setHavePile(ALL_VALUES.slice(0, 40));
+    setNotPile(ALL_VALUES.slice(40));
+    setStage(STAGES.halftime);
+  }
+  function skipToTopTen() {
+    const yes = ALL_VALUES.slice(0, 20);
+    setHavePile(yes);
+    setHalfSelections(yes);
+    setStage(STAGES.topTenIntro);
+  }
+  function skipToRanking() {
+    const top = ALL_VALUES.slice(0, 10);
+    setHavePile(ALL_VALUES.slice(0, 20));
+    setHalfSelections(ALL_VALUES.slice(0, 20));
+    setTopTenSelections(top);
+    setOrderedTopTen(top);
+    setStage(STAGES.rank);
+  }
+
+  // ── SHARED STYLES ─────────────────────────────────────────────────────────
+  const labelStyle = {
+    display: "block",
+    fontSize: 11,
+    fontWeight: 600,
+    marginBottom: 7,
+    color: C.textMuted,
+    textTransform: "uppercase",
+    letterSpacing: "0.1em",
+  };
+
+  const hintBox = {
+    border: `1px solid ${C.tealBorder}`,
+    background: C.tealBg,
+    borderRadius: 18,
+    padding: "18px 22px",
+    color: C.textSecondary,
+    lineHeight: 1.8,
+    fontSize: 15,
+  };
+
+  const counterRow = {
+    marginTop: 14,
+    border: `1px solid ${C.cardBorder}`,
+    borderRadius: 14,
+    padding: "12px 18px",
+    color: C.textSecondary,
+    display: "flex",
+    justifyContent: "space-between",
+    gap: 12,
+    flexWrap: "wrap",
+    fontSize: 14,
+  };
+
+  // ── RENDER ─────────────────────────────────────────────────────────────────
+  return (
+    <div style={{ minHeight: "100vh", padding: "22px 20px 70px" }}>
+      <div style={{ maxWidth: 1180, margin: "0 auto" }}>
+
+        {/* ── HEADER ─────────────────────────────────────────────────────────── */}
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 16, marginBottom: 30, flexWrap: "wrap" }}>
+          <div>
+            {/* Secret tap target — 5 taps toggles developer mode */}
+            <button
+              type="button"
+              onClick={handleSecretTap}
+              style={{ border: 0, background: "transparent", padding: 0, cursor: "pointer", letterSpacing: "0.24em", textTransform: "uppercase", fontSize: 11, color: C.teal, fontWeight: 600, fontFamily: "inherit" }}
+            >
+              Core Values Exercise
+            </button>
+            <h1 style={{ margin: "6px 0 0", fontSize: 30, lineHeight: 1.15, color: C.textPrimary, fontWeight: 700 }}>
+              Who are you, really?
+            </h1>
+            {counselorMode && (
+              <div style={{ marginTop: 6, color: C.gold, fontSize: 12, fontWeight: 600, letterSpacing: "0.05em" }}>
+                Developer mode on
+              </div>
+            )}
+          </div>
+          <Btn ghost onClick={resetAll}>Start over</Btn>
+        </div>
+
+        {/* ════════════════ INTRO ══════════════════════════════════════════════ */}
+        {stage === STAGES.intro && (
+          <StageCard>
+            <div style={{ fontSize: 26, fontWeight: 700, marginBottom: 6 }}>Before we begin</div>
+            <div style={{ color: C.textSecondary, fontSize: 16, marginBottom: 24, lineHeight: 1.75 }}>
+              Enter your name and your favorite kind of music. Then you'll receive your first instruction.
+            </div>
+
+            <div className="cv-grid cv-two" style={{ gridTemplateColumns: "1fr 1fr" }}>
+              <div>
+                <label style={labelStyle}>Your name</label>
+                <input value={name} onChange={(e) => setName(e.target.value)} placeholder="Type your name" />
+              </div>
+              <div>
+                <label style={labelStyle}>Favorite kind of music</label>
+                <input value={music} onChange={(e) => setMusic(e.target.value)} placeholder="R&B, country, worship, rap…" />
+              </div>
+            </div>
+
+            {/* Collapsible AI key */}
+            <div style={{ marginTop: 20 }}>
+              <button
+                type="button"
+                onClick={() => setShowKeyInput((v) => !v)}
+                style={{ background: "none", border: "none", color: C.teal, fontSize: 13, cursor: "pointer", padding: 0, fontWeight: 600, fontFamily: "inherit" }}
+              >
+                {showKeyInput ? "▾" : "▸"} AI narrative settings
+              </button>
+              {showKeyInput && (
+                <div style={{ marginTop: 12 }}>
+                  <label style={labelStyle}>OpenAI API key</label>
+                  <input
+                    type="password"
+                    value={apiKey}
+                    onChange={(e) => setApiKey(e.target.value)}
+                    placeholder="sk-…"
+                  />
+                  <div style={{ fontSize: 12, color: C.textMuted, marginTop: 6, lineHeight: 1.5 }}>
+                    Used only in this browser to generate a personalized narrative. Saved locally. Leave blank for a template statement.
+                  </div>
+                </div>
+              )}
+            </div>
+
+            <div style={{ ...hintBox, marginTop: 22 }}>
+              Once you continue, put on some{" "}
+              <strong style={{ color: C.textPrimary }}>{music || "music you love"}</strong>{" "}
+              and let it play the entire time. Then go one card at a time — sort each value into{" "}
+              <strong style={{ color: C.textPrimary }}>this feels like me</strong> or{" "}
+              <strong style={{ color: C.textPrimary }}>not so much</strong>.
+            </div>
+
+            <div style={{ display: "flex", flexWrap: "wrap", gap: 12, marginTop: 24 }}>
+              <Btn disabled={!canStart} onClick={() => setStage(STAGES.sort)}>
+                Begin the exercise
+              </Btn>
+              {counselorMode && (
+                <>
+                  <Btn ghost onClick={skipToHalf}>Skip → half</Btn>
+                  <Btn ghost onClick={skipToTopTen}>Skip → top 10</Btn>
+                  <Btn ghost onClick={skipToRanking}>Skip → ranking</Btn>
+                </>
+              )}
+            </div>
+          </StageCard>
+        )}
+
+        {/* ════════════════ SORT ═══════════════════════════════════════════════ */}
+        {stage === STAGES.sort && (
+          <>
+            <div className="cv-grid cv-two" style={{ gridTemplateColumns: "300px 1fr", marginBottom: 14 }}>
+              <StageCard>
+                <div style={{ fontSize: 11, color: C.teal, marginBottom: 5, textTransform: "uppercase", letterSpacing: "0.16em", fontWeight: 600 }}>
+                  Now playing
+                </div>
+                <div style={{ fontSize: 18, fontWeight: 700 }}>{music}</div>
+              </StageCard>
+              <StageCard>
+                <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 10, color: C.textSecondary, fontSize: 14 }}>
+                  <span>Sorted {sortIndex} of {deck.length}</span>
+                  <span style={{ color: C.gold, fontWeight: 600 }}>{sortProgress}%</span>
+                </div>
+                <ProgressBar value={sortProgress} />
+              </StageCard>
+            </div>
+
+            <StageCard>
+              <div style={{ fontSize: 11, color: C.textMuted, textAlign: "center", marginBottom: 20, letterSpacing: "0.1em", textTransform: "uppercase" }}>
+                Read the word · Choose a pile
+              </div>
+              <div style={{
+                borderRadius: 26,
+                border: `1px solid ${C.cardBorder}`,
+                background: "radial-gradient(ellipse at center, rgba(93,212,184,0.07) 0%, transparent 72%)",
+                padding: "72px 24px",
+                textAlign: "center",
+                fontSize: 46,
+                fontWeight: 700,
+                minHeight: 220,
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                letterSpacing: "-0.015em",
+                color: C.textPrimary,
+              }}>
+                {currentValue}
+              </div>
+              <div className="cv-grid cv-two" style={{ gridTemplateColumns: "1fr 1fr", marginTop: 22 }}>
+                <Btn onClick={() => choosePile("have")} style={{ height: 56 }}>This feels like me</Btn>
+                <Btn ghost onClick={() => choosePile("not")} style={{ height: 56 }}>Not so much</Btn>
+              </div>
+            </StageCard>
+          </>
+        )}
+
+        {/* ════════════════ HALFTIME — fade-in ═════════════════════════════════ */}
+        {stage === STAGES.halftime && (
+          <StageCard glow>
+            <div style={{ fontSize: 32, fontWeight: 700, marginBottom: 18 }}>
+              <FadeInWords text="Great work." msPerWord={140} />
+            </div>
+            <div style={{ color: C.textSecondary, fontSize: 18, lineHeight: 1.9, marginBottom: 24 }}>
+              <FadeInWords
+                text={`You made it through all ${deck.length} values. Take a breath. You now have ${havePile.length} in your "this feels like me" pile.`}
+                msPerWord={82}
+              />
+            </div>
+            <div style={hintBox}>
+              <FadeInWords
+                text="One more step: from the values you chose, narrow them down to half. Don't overthink it — just keep the ones that feel the strongest."
+                msPerWord={68}
+              />
+            </div>
+            <div style={{ marginTop: 26 }}>
+              <Btn onClick={() => setStage(STAGES.narrowHalf)}>Continue</Btn>
+            </div>
+          </StageCard>
+        )}
+
+        {/* ════════════════ NARROW HALF ════════════════════════════════════════ */}
+        {stage === STAGES.narrowHalf && (
+          <StageCard wide>
+            <div style={{ fontSize: 26, fontWeight: 700, marginBottom: 8 }}>Choose your strongest half</div>
+            <div style={{ color: C.textSecondary, fontSize: 15, marginBottom: 18 }}>
+              Select <strong style={{ color: C.gold }}>{halfTarget}</strong> values from your pile of {havePile.length}.
+            </div>
+            <div className="cv-wrap">
+              {havePile.map((v) => (
+                <Pill key={v} label={v} active={halfSelections.includes(v)} onClick={() => toggleHalf(v)} />
+              ))}
+            </div>
+            <div style={counterRow}>
+              <span><strong style={{ color: C.teal }}>{halfSelections.length}</strong> selected</span>
+              <span><strong style={{ color: C.gold }}>{Math.max(0, halfTarget - halfSelections.length)}</strong> remaining</span>
+            </div>
+            <div style={{ marginTop: 22 }}>
+              <Btn disabled={halfSelections.length !== halfTarget} onClick={() => setStage(STAGES.topTenIntro)}>
+                Keep going
+              </Btn>
+            </div>
+          </StageCard>
+        )}
+
+        {/* ════════════════ TOP TEN INTRO — fade-in ════════════════════════════ */}
+        {stage === STAGES.topTenIntro && (
+          <StageCard glow>
+            <div style={{ fontSize: 32, fontWeight: 700, marginBottom: 18 }}>
+              <FadeInWords text="Nice work." msPerWord={140} />
+            </div>
+            <div style={{ color: C.textSecondary, fontSize: 18, lineHeight: 1.9, marginBottom: 24 }}>
+              <FadeInWords
+                text="You've narrowed beautifully. Pause for a second and notice what is already rising to the top."
+                msPerWord={82}
+              />
+            </div>
+            <div style={hintBox}>
+              <FadeInWords
+                text="Now trim it one more time. Choose your top 10 — the values that feel most central to who you are."
+                msPerWord={68}
+              />
+            </div>
+            <div style={{ marginTop: 26 }}>
+              <Btn onClick={() => setStage(STAGES.topTen)}>Continue</Btn>
+            </div>
+          </StageCard>
+        )}
+
+        {/* ════════════════ TOP TEN ════════════════════════════════════════════ */}
+        {stage === STAGES.topTen && (
+          <StageCard wide>
+            <div style={{ fontSize: 26, fontWeight: 700, marginBottom: 8 }}>Select your top 10</div>
+            <div style={{ color: C.textSecondary, fontSize: 15, marginBottom: 18 }}>
+              Pick exactly 10 from the group you just kept.
+            </div>
+            <div className="cv-wrap">
+              {halfSelections.map((v) => (
+                <Pill key={v} label={v} active={topTenSelections.includes(v)} onClick={() => toggleTopTen(v)} />
+              ))}
+            </div>
+            <div style={counterRow}>
+              <span><strong style={{ color: C.teal }}>{topTenSelections.length}</strong> selected</span>
+              <span><strong style={{ color: C.gold }}>{Math.max(0, 10 - topTenSelections.length)}</strong> remaining</span>
+            </div>
+            <div style={{ marginTop: 22 }}>
+              <Btn
+                disabled={topTenSelections.length !== 10}
+                onClick={() => { setOrderedTopTen(topTenSelections); setStage(STAGES.rankIntro); }}
+              >
+                Continue
+              </Btn>
+            </div>
+          </StageCard>
+        )}
+
+        {/* ════════════════ RANK INTRO — fade-in ═══════════════════════════════ */}
+        {stage === STAGES.rankIntro && (
+          <StageCard glow>
+            <div style={{ fontSize: 32, fontWeight: 700, marginBottom: 18 }}>
+              <FadeInWords text="You found your ten." msPerWord={140} />
+            </div>
+            <div style={{ color: C.textSecondary, fontSize: 18, lineHeight: 1.9, marginBottom: 24 }}>
+              <FadeInWords
+                text="That alone is real work. You just made ten distinctions about yourself that most people never stop to make."
+                msPerWord={82}
+              />
+            </div>
+            <div style={hintBox}>
+              <FadeInWords
+                text="Final step: put them in order. Place the value that feels most essential at the top and keep going until all ten are ranked."
+                msPerWord={68}
+              />
+            </div>
+            <div style={{ marginTop: 26 }}>
+              <Btn onClick={() => setStage(STAGES.rank)}>Rank my values</Btn>
+            </div>
+          </StageCard>
+        )}
+
+        {/* ════════════════ RANK ═══════════════════════════════════════════════ */}
+        {stage === STAGES.rank && (
+          <StageCard>
+            <div style={{ fontSize: 26, fontWeight: 700, marginBottom: 8 }}>Put your top 10 in order</div>
+            <div style={{ color: C.textSecondary, fontSize: 14, marginBottom: 22 }}>
+              Drag the cards or use the arrows. #1 is your most important value.
+            </div>
+            <div className="cv-grid" style={{ gap: 9 }}>
+              {orderedTopTen.map((value, idx) => (
+                <div
+                  key={value}
+                  className="cv-rank-card"
+                  draggable
+                  onDragStart={(e) => onDragStart(idx, e)}
+                  onDragEnd={onDragEnd}
+                  onDragOver={(e) => e.preventDefault()}
+                  onDrop={() => onDrop(idx)}
+                  style={{
+                    display: "flex",
+                    alignItems: "center",
+                    gap: 14,
+                    border: `1px solid ${idx === 0 ? C.goldBorder : C.cardBorder}`,
+                    background: idx === 0 ? C.goldBg : "rgba(255,255,255,0.025)",
+                    borderRadius: 18,
+                    padding: "11px 14px",
+                    cursor: "grab",
+                    transition: "border-color 0.2s, background 0.2s",
+                  }}
+                >
+                  <div style={{
+                    width: 36, height: 36, borderRadius: 11,
+                    background: idx === 0 ? "rgba(212,168,71,0.15)" : "rgba(255,255,255,0.05)",
+                    display: "flex", alignItems: "center", justifyContent: "center",
+                    fontWeight: 700, fontSize: 14,
+                    color: idx === 0 ? C.gold : C.textMuted,
+                  }}>
+                    {idx + 1}
+                  </div>
+                  <div style={{ fontSize: 16, color: C.textMuted }}>⋮⋮</div>
+                  <div style={{ flex: 1, fontSize: 16, fontWeight: 600 }}>{value}</div>
+                  <div style={{ display: "flex", gap: 7 }}>
+                    <Btn ghost disabled={idx === 0} onClick={() => moveRank(idx, "up")} style={{ padding: "6px 10px", fontSize: 13 }}>↑</Btn>
+                    <Btn ghost disabled={idx === orderedTopTen.length - 1} onClick={() => moveRank(idx, "down")} style={{ padding: "6px 10px", fontSize: 13 }}>↓</Btn>
+                  </div>
+                </div>
+              ))}
+            </div>
+            <div style={{ marginTop: 24 }}>
+              <Btn onClick={() => setStage(STAGES.narrativeIntro)}>See my final reflection</Btn>
+            </div>
+          </StageCard>
+        )}
+
+        {/* ════════════════ NARRATIVE INTRO — fade-in (the big one) ════════════ */}
+        {stage === STAGES.narrativeIntro && (
+          <StageCard glow>
+            <div style={{ fontSize: 32, fontWeight: 700, marginBottom: 18 }}>
+              <FadeInWords text="Pause here." msPerWord={160} />
+            </div>
+            <div style={{ color: C.textSecondary, fontSize: 16, marginBottom: 22 }}>
+              <FadeInWords
+                text="Before you read your final statement, take one quiet moment."
+                msPerWord={95}
+              />
+            </div>
+            <div style={{ ...hintBox, fontSize: 17, lineHeight: 1.95 }}>
+              <FadeInWords text={processReflection} msPerWord={55} />
+            </div>
+            <div style={{ marginTop: 26, display: "flex", gap: 16, alignItems: "center", flexWrap: "wrap" }}>
+              {generating ? (
+                <DotLoader />
+              ) : (
+                <Btn onClick={() => setStage(STAGES.narrative)}>Reveal my statement</Btn>
+              )}
+              {genError && (
+                <span style={{ fontSize: 12, color: "#f87171", lineHeight: 1.4 }}>
+                  {genError} — using template instead.
+                </span>
+              )}
+            </div>
+          </StageCard>
+        )}
+
+        {/* ════════════════ NARRATIVE ══════════════════════════════════════════ */}
+        {stage === STAGES.narrative && (
+          <StageCard>
+            {/* Name header */}
+            <div style={{ background: C.goldBg, border: `1px solid ${C.goldBorder}`, borderRadius: 22, padding: "22px 28px", marginBottom: 26 }}>
+              <h2 style={{ margin: 0, fontSize: 28, color: C.textPrimary, fontWeight: 700 }}>
+                <FadeInWords text={`My name is ${name}.`} msPerWord={140} />
+              </h2>
+            </div>
+
+            {/* Read-aloud nudge */}
+            <div style={{ ...hintBox, marginBottom: 26, fontSize: 14 }}>
+              Read this out loud slowly — like you are telling someone who you are and what you stand for.
+            </div>
+
+            {/* AI narrative — fades in word by word */}
+            <div style={{ fontSize: 18, lineHeight: 1.95, marginBottom: 34, color: C.textPrimary }}>
+              <FadeInWords text={aiNarrative} msPerWord={50} />
+            </div>
+
+            {/* Chips */}
+            <div style={{ fontSize: 11, textTransform: "uppercase", letterSpacing: "0.2em", color: C.teal, marginBottom: 12, fontWeight: 600 }}>
+              Final Reflection
+            </div>
+            <div className="cv-wrap" style={{ marginBottom: 28 }}>
+              {orderedTopTen.map((v, i) => (
+                <div key={v} style={{ border: `1px solid ${C.goldBorder}`, background: C.goldBg, borderRadius: 999, padding: "7px 14px", fontSize: 13, fontWeight: 600, color: C.gold }}>
+                  #{i + 1} {v}
+                </div>
+              ))}
+            </div>
+
+            {/* Two-column summary */}
+            <div className="cv-grid cv-two" style={{ gridTemplateColumns: "1fr 1fr", marginBottom: 26 }}>
+              <div style={{ border: `1px solid ${C.cardBorder}`, borderRadius: 20, padding: 20, background: "rgba(255,255,255,0.02)" }}>
+                <div style={{ fontSize: 11, color: C.textMuted, marginBottom: 12, textTransform: "uppercase", letterSpacing: "0.1em", fontWeight: 600 }}>
+                  Ranked values
+                </div>
+                <ol style={{ margin: 0, paddingLeft: 22, lineHeight: 1.95, color: C.textSecondary, fontSize: 14 }}>
+                  {orderedTopTen.map((v, i) => <li key={v}>{i + 1}. {v}</li>)}
+                </ol>
+              </div>
+              <div style={{ border: `1px solid ${C.cardBorder}`, borderRadius: 20, padding: 20, background: "rgba(255,255,255,0.02)" }}>
+                <div style={{ fontSize: 11, color: C.textMuted, marginBottom: 12, textTransform: "uppercase", letterSpacing: "0.1em", fontWeight: 600 }}>
+                  Prompt for discussion
+                </div>
+                <div style={{ color: C.textSecondary, lineHeight: 1.8, fontSize: 14 }}>
+                  Which value felt easiest to choose? Which one surprised you? Which one do you most want your daily actions to reflect more clearly?
+                </div>
+              </div>
+            </div>
+
+            <div style={{ display: "flex", flexWrap: "wrap", gap: 12 }}>
+              <Btn ghost onClick={() => setStage(STAGES.rank)}>Back to ranking</Btn>
+              <Btn ghost onClick={() => downloadPdfLikeHtml({ name, orderedTopTen, narrative: aiNarrative, processReflection })}>
+                Download PDF
+              </Btn>
+              <Btn onClick={resetAll}>Start new session</Btn>
+            </div>
+          </StageCard>
+        )}
+
+      </div>
+    </div>
+  );
+}

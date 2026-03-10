@@ -1,0 +1,4 @@
+/* Global resets — the app's injected stylesheet owns all other styles */
+*, *::before, *::after { box-sizing: border-box; }
+body { margin: 0; min-height: 100vh; min-width: 320px; }
+#root { min-height: 100vh; }
