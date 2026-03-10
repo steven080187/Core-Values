@@ -167,6 +167,22 @@ function FadeInWords({ text, msPerWord = 80 }) {
   );
 }
 
+// ─── DELAYED REVEAL ──────────────────────────────────────────────────────────
+// Wraps children in opacity 0 → 1 after `ms` milliseconds.
+// Used to let the celebration text settle before revealing the next challenge.
+function Delayed({ ms, children }) {
+  const [show, setShow] = useState(false);
+  useEffect(() => {
+    const t = setTimeout(() => setShow(true), ms);
+    return () => clearTimeout(t);
+  }, [ms]);
+  return (
+    <div style={{ opacity: show ? 1 : 0, transition: "opacity 1.1s ease", pointerEvents: show ? "auto" : "none" }}>
+      {children}
+    </div>
+  );
+}
+
 // ─── DESIGN TOKENS ────────────────────────────────────────────────────────────
 // Deep ocean midnight — evokes introspection, depth, stillness.
 // Gold — worth, value, the light inside each person.
@@ -654,13 +670,6 @@ export default function CoreValuesSortApp() {
               ))}
             </div>
 
-            <div style={{ border: `1px solid ${C.tealBorder}`, background: C.tealBg, borderRadius: 18, padding: "20px 24px", marginBottom: 36 }}>
-              <div style={{ fontSize: 11, fontWeight: 600, letterSpacing: "0.14em", textTransform: "uppercase", color: C.teal, marginBottom: 10 }}>What you'll do</div>
-              <div style={{ fontSize: 15, lineHeight: 1.85, color: C.textSecondary }}>
-                You'll move through a full list of values one at a time — keeping what resonates, setting the rest aside. You'll narrow them down until ten remain, rank them in your own order, and finish with a personal statement about what you stand for.
-              </div>
-            </div>
-
             <div style={{ textAlign: "center" }}>
               <Btn onClick={() => setStage(STAGES.intro)} style={{ padding: "15px 40px", fontSize: 16 }}>
                 I'm ready →
@@ -750,23 +759,23 @@ export default function CoreValuesSortApp() {
         {stage === STAGES.halftime && (
           <StageCard glow>
             <div style={{ fontSize: 32, fontWeight: 700, marginBottom: 18 }}>
-              <FadeInWords text="Great work." msPerWord={140} />
+              <FadeInWords text="You made it." msPerWord={140} />
             </div>
-            <div style={{ color: C.textSecondary, fontSize: 18, lineHeight: 1.9, marginBottom: 24 }}>
+            <div style={{ color: C.textSecondary, fontSize: 18, lineHeight: 1.9, marginBottom: 28 }}>
               <FadeInWords
-                text={`You made it through all ${deck.length} values. Take a breath. You now have ${havePile.length} in your "this feels like me" pile.`}
-                msPerWord={82}
+                text={`You just went through all ${deck.length} values and kept ${havePile.length} that felt like you. Look at that list. Each one of those was a real choice — and you made it.`}
+                msPerWord={78}
               />
             </div>
-            <div style={hintBox}>
-              <FadeInWords
-                text="One more step: from the values you chose, narrow them down to half. Don't overthink it — just keep the ones that feel the strongest."
-                msPerWord={68}
-              />
-            </div>
-            <div style={{ marginTop: 26 }}>
-              <Btn onClick={() => setStage(STAGES.narrowHalf)}>Continue</Btn>
-            </div>
+            <Delayed ms={3600}>
+              <div style={{ ...hintBox, marginBottom: 26 }}>
+                <FadeInWords
+                  text={`One catch. We're going to ask you to let some of them go. From everything you just chose, keep only half — the ${halfTarget} words that feel the strongest. The ones you'd fight to keep.`}
+                  msPerWord={62}
+                />
+              </div>
+              <Btn onClick={() => setStage(STAGES.narrowHalf)}>Alright — let's do it</Btn>
+            </Delayed>
           </StageCard>
         )}
 
@@ -798,23 +807,23 @@ export default function CoreValuesSortApp() {
         {stage === STAGES.topTenIntro && (
           <StageCard glow>
             <div style={{ fontSize: 32, fontWeight: 700, marginBottom: 18 }}>
-              <FadeInWords text="Nice work." msPerWord={140} />
+              <FadeInWords text="Look at what held on." msPerWord={140} />
             </div>
-            <div style={{ color: C.textSecondary, fontSize: 18, lineHeight: 1.9, marginBottom: 24 }}>
+            <div style={{ color: C.textSecondary, fontSize: 18, lineHeight: 1.9, marginBottom: 28 }}>
               <FadeInWords
-                text="You've narrowed beautifully. Pause for a second and notice what is already rising to the top."
+                text="You made real choices back there. The words that didn't make the cut — you let them go. These ones survived. They meant more."
                 msPerWord={82}
               />
             </div>
-            <div style={hintBox}>
-              <FadeInWords
-                text="Now trim it one more time. Choose your top 10 — the values that feel most central to who you are."
-                msPerWord={68}
-              />
-            </div>
-            <div style={{ marginTop: 26 }}>
-              <Btn onClick={() => setStage(STAGES.topTen)}>Continue</Btn>
-            </div>
+            <Delayed ms={3200}>
+              <div style={{ ...hintBox, marginBottom: 26 }}>
+                <FadeInWords
+                  text="We're going to ask you one more thing. From these, we need your top ten — the ten that feel most central to who you are."
+                  msPerWord={62}
+                />
+              </div>
+              <Btn onClick={() => setStage(STAGES.topTen)}>I can do that</Btn>
+            </Delayed>
           </StageCard>
         )}
 
@@ -851,21 +860,21 @@ export default function CoreValuesSortApp() {
             <div style={{ fontSize: 32, fontWeight: 700, marginBottom: 18 }}>
               <FadeInWords text="You found your ten." msPerWord={140} />
             </div>
-            <div style={{ color: C.textSecondary, fontSize: 18, lineHeight: 1.9, marginBottom: 24 }}>
+            <div style={{ color: C.textSecondary, fontSize: 18, lineHeight: 1.9, marginBottom: 28 }}>
               <FadeInWords
-                text="That alone is real work. You just made ten distinctions about yourself that most people never stop to make."
+                text="These are not ten random words. You went through all of those options and worked your way down to these. Every one of them earned its place."
                 msPerWord={82}
               />
             </div>
-            <div style={hintBox}>
-              <FadeInWords
-                text="Final step: put them in order. Place the value that feels most essential at the top and keep going until all ten are ranked."
-                msPerWord={68}
-              />
-            </div>
-            <div style={{ marginTop: 26 }}>
-              <Btn onClick={() => setStage(STAGES.rank)}>Rank my values</Btn>
-            </div>
+            <Delayed ms={3200}>
+              <div style={{ ...hintBox, marginBottom: 26 }}>
+                <FadeInWords
+                  text="Last thing. We need you to put them in order. Number one at the top — the value that, when life gets hard, you come back to first."
+                  msPerWord={62}
+                />
+              </div>
+              <Btn onClick={() => setStage(STAGES.rank)}>Put them in order</Btn>
+            </Delayed>
           </StageCard>
         )}
 
