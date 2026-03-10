@@ -631,7 +631,7 @@ export default function CoreValuesSortApp() {
         {stage === STAGES.welcome && (
           <StageCard wide>
             <div style={{ textAlign: "center", padding: "14px 0 40px" }}>
-              <h2 style={{ margin: "0 0 18px",
+              <h2 style={{ margin: "0 0 18px", fontSize: 42, fontWeight: 700, lineHeight: 1.15, color: C.textPrimary }}>
                 Know what you stand for.
               </h2>
               <p style={{ margin: "0 auto", maxWidth: 520, fontSize: 17, lineHeight: 1.9, color: C.textSecondary }}>
