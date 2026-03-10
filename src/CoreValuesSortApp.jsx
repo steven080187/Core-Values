@@ -69,16 +69,21 @@ About 200–240 words. No bullet points, no headers — just flowing first-perso
 }
 
 function buildFallbackNarrative(name, values) {
-  if (!values.length) return "";
+  if (values.length < 10) return "";
+  const [v1, v2, v3, v4, v5, v6, v7, v8, v9, v10] = values;
   return (
-    `My name is ${name}. My top core value is ${values[0].toLowerCase()}. ` +
-    values.map((v) => `I value ${v.toLowerCase()}.`).join(" ") +
-    " These are not random words. They are an honest map of who I am and the life I am building."
+    `My name is ${name}. My top core value is ${v1.toLowerCase()}, and it is the lens through which I see everything else in my life. ` +
+    `${v2} and ${v3} live close behind — they shape the way I treat people, the standards I hold for myself, and what I refuse to give up on. ` +
+    `${v4} and ${v5} are values I carry into hard moments. When I am uncertain, when I am tired, when I want to quit — I come back to these. ` +
+    `${v6} and ${v7} remind me that I do not have to earn my worth. They describe who I already am. ` +
+    `${v8} and ${v9} are part of the person I am still becoming — and becoming is enough. ` +
+    `And ${v10.toLowerCase()} ties all of it together. ` +
+    `These are not random words. They are the honest shape of who I am and the life I am building.`
   );
 }
 
 function buildProcessReflection(name) {
-  return `${name || "You"}, turn your music off for a moment. What you just did was not small. You moved through ${ALL_VALUES.length} core values and sorted them — keeping what felt true, letting go of what did not. Then you narrowed them down twice, until only ten remained. Then you placed those ten in order, from your number one core value to your number ten. These are not a random collection of nice words. You just completed a thorough examination of yourself. You paid attention, made real distinctions, and listened for what was true. The values in front of you are not accidental. They are an honest map of who you are. Now read your statement out loud, like you are telling someone who you are and what you stand for.`;
+  return `${name || "You"}, take a breath and step back for just a moment. What you just did was not small. You moved through ${ALL_VALUES.length} core values and sorted them — keeping what felt true, letting go of what did not. Then you narrowed them down twice, until only ten remained. Then you placed those ten in order, from your number one core value to your number ten. These are not a random collection of nice words. You just completed a thorough examination of yourself. You paid attention, made real distinctions, and listened for what was true. The values in front of you are not accidental. They are an honest map of who you are. Now read your statement out loud, like you are telling someone who you are and what you stand for.`;
 }
 
 // ─── PDF ─────────────────────────────────────────────────────────────────────
@@ -301,7 +306,6 @@ function DotLoader({ label = "Creating your statement…" }) {
 // ─── MAIN APP ─────────────────────────────────────────────────────────────────
 export default function CoreValuesSortApp() {
   const [name, setName] = useState("");
-  const [music, setMusic] = useState("");
   const [stage, setStage] = useState(STAGES.intro);
   const [deck, setDeck] = useState(() => shuffleArray(ALL_VALUES));
   const [sortIndex, setSortIndex] = useState(0);
@@ -312,21 +316,25 @@ export default function CoreValuesSortApp() {
   const [orderedTopTen, setOrderedTopTen] = useState([]);
   const [counselorMode, setCounselorMode] = useState(false);
   const [tapCount, setTapCount] = useState(0);
-  const dragIndexRef = useRef(null);
 
   // AI narrative state
   const [apiKey, setApiKey] = useState(() => localStorage.getItem("cv_oai_key") || "");
   const [aiNarrative, setAiNarrative] = useState("");
   const [generating, setGenerating] = useState(false);
   const [genError, setGenError] = useState("");
-  const [showKeyInput, setShowKeyInput] = useState(false);
+
+  // Rank drag state (pointer-event live reorder)
+  const [rankDragValue, setRankDragValue] = useState(null);
+  const [rankLiveOrder, setRankLiveOrder] = useState(null);
+  const rankLiveOrderRef = useRef(null);
 
   // Derived
   const currentValue = deck[sortIndex];
   const sortProgress = Math.round((sortIndex / deck.length) * 100);
   const halfTarget = Math.max(1, Math.ceil(havePile.length / 2));
-  const canStart = name.trim() !== "" && music.trim() !== "";
+  const canStart = name.trim() !== "";
   const processReflection = buildProcessReflection(name);
+  const displayRankOrder = rankLiveOrder ?? orderedTopTen;
 
   // Persist API key
   useEffect(() => {
@@ -467,33 +475,50 @@ export default function CoreValuesSortApp() {
     });
   }
 
-  function moveRank(idx, dir) {
-    const next = [...orderedTopTen];
-    const swap = dir === "up" ? idx - 1 : idx + 1;
-    if (swap < 0 || swap >= next.length) return;
-    [next[idx], next[swap]] = [next[swap], next[idx]];
-    setOrderedTopTen(next);
+  // ── Rank drag — pointer-event live reorder ────────────────────────────────
+  function startRankDrag(value) {
+    const order = [...orderedTopTen];
+    rankLiveOrderRef.current = order;
+    setRankLiveOrder(order);
+    setRankDragValue(value);
   }
 
-  function onDragStart(idx, e) {
-    dragIndexRef.current = idx;
-    e?.currentTarget?.classList.add("dragging");
-  }
+  useEffect(() => {
+    if (!rankDragValue) return;
 
-  function onDragEnd(e) {
-    dragIndexRef.current = null;
-    e?.currentTarget?.classList.remove("dragging");
-  }
+    function handleMove(e) {
+      const el = document.elementFromPoint(e.clientX, e.clientY);
+      const card = el?.closest?.('[data-rank-card]');
+      if (!card) return;
+      const targetVal = card.getAttribute('data-rank-card');
+      if (!targetVal || targetVal === rankDragValue) return;
+      const lo = rankLiveOrderRef.current;
+      if (!lo) return;
+      const fromIdx = lo.indexOf(rankDragValue);
+      const toIdx = lo.indexOf(targetVal);
+      if (fromIdx === -1 || toIdx === -1 || fromIdx === toIdx) return;
+      const next = [...lo];
+      next.splice(fromIdx, 1);
+      next.splice(toIdx, 0, rankDragValue);
+      rankLiveOrderRef.current = next;
+      setRankLiveOrder(next);
+    }
 
-  function onDrop(dropIdx) {
-    const from = dragIndexRef.current;
-    if (from == null || from === dropIdx) return;
-    const next = [...orderedTopTen];
-    const [moved] = next.splice(from, 1);
-    next.splice(dropIdx, 0, moved);
-    setOrderedTopTen(next);
-    dragIndexRef.current = null;
-  }
+    function handleUp() {
+      if (rankLiveOrderRef.current) setOrderedTopTen(rankLiveOrderRef.current);
+      setRankDragValue(null);
+      setRankLiveOrder(null);
+      rankLiveOrderRef.current = null;
+    }
+
+    window.addEventListener('pointermove', handleMove);
+    window.addEventListener('pointerup', handleUp);
+    return () => {
+      window.removeEventListener('pointermove', handleMove);
+      window.removeEventListener('pointerup', handleUp);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [rankDragValue]);
 
   // Developer skip helpers — preserved intact
   function skipToHalf() {
@@ -583,49 +608,30 @@ export default function CoreValuesSortApp() {
           <StageCard>
             <div style={{ fontSize: 26, fontWeight: 700, marginBottom: 6 }}>Before we begin</div>
             <div style={{ color: C.textSecondary, fontSize: 16, marginBottom: 24, lineHeight: 1.75 }}>
-              Enter your name and your favorite kind of music. Then you'll receive your first instruction.
+              Enter your name, then begin the exercise.
             </div>
 
-            <div className="cv-grid cv-two" style={{ gridTemplateColumns: "1fr 1fr" }}>
-              <div>
-                <label style={labelStyle}>Your name</label>
-                <input value={name} onChange={(e) => setName(e.target.value)} placeholder="Type your name" />
-              </div>
-              <div>
-                <label style={labelStyle}>Favorite kind of music</label>
-                <input value={music} onChange={(e) => setMusic(e.target.value)} placeholder="R&B, country, worship, rap…" />
-              </div>
+            <div style={{ marginBottom: 20 }}>
+              <label style={labelStyle}>Your name</label>
+              <input value={name} onChange={(e) => setName(e.target.value)} placeholder="Type your name" />
             </div>
 
-            {/* Collapsible AI key */}
-            <div style={{ marginTop: 20 }}>
-              <button
-                type="button"
-                onClick={() => setShowKeyInput((v) => !v)}
-                style={{ background: "none", border: "none", color: C.teal, fontSize: 13, cursor: "pointer", padding: 0, fontWeight: 600, fontFamily: "inherit" }}
-              >
-                {showKeyInput ? "▾" : "▸"} AI narrative settings
-              </button>
-              {showKeyInput && (
-                <div style={{ marginTop: 12 }}>
-                  <label style={labelStyle}>OpenAI API key</label>
-                  <input
-                    type="password"
-                    value={apiKey}
-                    onChange={(e) => setApiKey(e.target.value)}
-                    placeholder="sk-…"
-                  />
-                  <div style={{ fontSize: 12, color: C.textMuted, marginTop: 6, lineHeight: 1.5 }}>
-                    Used only in this browser to generate a personalized narrative. Saved locally. Leave blank for a template statement.
-                  </div>
-                </div>
-              )}
+            {/* API key — always visible */}
+            <div style={{ marginBottom: 4 }}>
+              <label style={labelStyle}>OpenAI API key <span style={{ color: C.textMuted, fontWeight: 400, textTransform: "none", letterSpacing: 0 }}>(for AI-written narrative)</span></label>
+              <input
+                type="password"
+                value={apiKey}
+                onChange={(e) => setApiKey(e.target.value)}
+                placeholder="sk-… (leave blank for template)"
+              />
+              <div style={{ fontSize: 12, color: C.textMuted, marginTop: 6, lineHeight: 1.5 }}>
+                Saved in this browser. The AI uses your top 10 values to write a personalized first-person statement.
+              </div>
             </div>
 
             <div style={{ ...hintBox, marginTop: 22 }}>
-              Once you continue, put on some{" "}
-              <strong style={{ color: C.textPrimary }}>{music || "music you love"}</strong>{" "}
-              and let it play the entire time. Then go one card at a time — sort each value into{" "}
+              Go one card at a time — sort each value into{" "}
               <strong style={{ color: C.textPrimary }}>this feels like me</strong> or{" "}
               <strong style={{ color: C.textPrimary }}>not so much</strong>.
             </div>
@@ -648,22 +654,15 @@ export default function CoreValuesSortApp() {
         {/* ════════════════ SORT ═══════════════════════════════════════════════ */}
         {stage === STAGES.sort && (
           <>
-            <div className="cv-grid cv-two" style={{ gridTemplateColumns: "300px 1fr", marginBottom: 14 }}>
-              <StageCard>
-                <div style={{ fontSize: 11, color: C.teal, marginBottom: 5, textTransform: "uppercase", letterSpacing: "0.16em", fontWeight: 600 }}>
-                  Now playing
-                </div>
-                <div style={{ fontSize: 18, fontWeight: 700 }}>{music}</div>
-              </StageCard>
-              <StageCard>
-                <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 10, color: C.textSecondary, fontSize: 14 }}>
-                  <span>Sorted {sortIndex} of {deck.length}</span>
-                  <span style={{ color: C.gold, fontWeight: 600 }}>{sortProgress}%</span>
-                </div>
-                <ProgressBar value={sortProgress} />
-              </StageCard>
-            </div>
+            <StageCard>
+              <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 10, color: C.textSecondary, fontSize: 14 }}>
+                <span>Card {sortIndex + 1} of {deck.length}</span>
+                <span style={{ color: C.gold, fontWeight: 600 }}>{sortProgress}%</span>
+              </div>
+              <ProgressBar value={sortProgress} />
+            </StageCard>
 
+            <div style={{ marginTop: 14 }}>
             <StageCard>
               <div style={{ fontSize: 11, color: C.textMuted, textAlign: "center", marginBottom: 20, letterSpacing: "0.1em", textTransform: "uppercase" }}>
                 Read the word · Choose a pile
@@ -690,6 +689,7 @@ export default function CoreValuesSortApp() {
                 <Btn ghost onClick={() => choosePile("not")} style={{ height: 56 }}>Not so much</Btn>
               </div>
             </StageCard>
+            </div>
           </>
         )}
 
@@ -819,51 +819,82 @@ export default function CoreValuesSortApp() {
         {/* ════════════════ RANK ═══════════════════════════════════════════════ */}
         {stage === STAGES.rank && (
           <StageCard>
-            <div style={{ fontSize: 26, fontWeight: 700, marginBottom: 8 }}>Put your top 10 in order</div>
-            <div style={{ color: C.textSecondary, fontSize: 14, marginBottom: 22 }}>
-              Drag the cards or use the arrows. #1 is your most important value.
+            <div style={{ fontSize: 26, fontWeight: 700, marginBottom: 6 }}>Put your top 10 in order</div>
+            <div style={{ color: C.textSecondary, fontSize: 14, marginBottom: 24 }}>
+              Hold and drag any card to reorder. #1 is your most important value.
             </div>
-            <div className="cv-grid" style={{ gap: 9 }}>
-              {orderedTopTen.map((value, idx) => (
-                <div
-                  key={value}
-                  className="cv-rank-card"
-                  draggable
-                  onDragStart={(e) => onDragStart(idx, e)}
-                  onDragEnd={onDragEnd}
-                  onDragOver={(e) => e.preventDefault()}
-                  onDrop={() => onDrop(idx)}
-                  style={{
-                    display: "flex",
-                    alignItems: "center",
-                    gap: 14,
-                    border: `1px solid ${idx === 0 ? C.goldBorder : C.cardBorder}`,
-                    background: idx === 0 ? C.goldBg : "rgba(255,255,255,0.025)",
-                    borderRadius: 18,
-                    padding: "11px 14px",
-                    cursor: "grab",
-                    transition: "border-color 0.2s, background 0.2s",
-                  }}
-                >
-                  <div style={{
-                    width: 36, height: 36, borderRadius: 11,
-                    background: idx === 0 ? "rgba(212,168,71,0.15)" : "rgba(255,255,255,0.05)",
-                    display: "flex", alignItems: "center", justifyContent: "center",
-                    fontWeight: 700, fontSize: 14,
-                    color: idx === 0 ? C.gold : C.textMuted,
-                  }}>
-                    {idx + 1}
+            <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+              {displayRankOrder.map((value, idx) => {
+                const isDragging = rankDragValue === value;
+                const isFirst = idx === 0;
+                return (
+                  <div
+                    key={value}
+                    data-rank-card={value}
+                    onPointerDown={(e) => {
+                      e.preventDefault();
+                      startRankDrag(value);
+                    }}
+                    style={{
+                      display: "flex",
+                      alignItems: "center",
+                      gap: 16,
+                      border: isDragging
+                        ? `1px solid ${C.teal}`
+                        : isFirst
+                        ? `1px solid ${C.goldBorder}`
+                        : `1px solid ${C.cardBorder}`,
+                      background: isDragging
+                        ? "rgba(93,212,184,0.12)"
+                        : isFirst
+                        ? C.goldBg
+                        : "rgba(255,255,255,0.03)",
+                      borderRadius: 20,
+                      padding: "14px 18px",
+                      cursor: isDragging ? "grabbing" : "grab",
+                      userSelect: "none",
+                      touchAction: "none",
+                      transform: isDragging ? "scale(1.025)" : "scale(1)",
+                      boxShadow: isDragging
+                        ? `0 20px 48px rgba(0,0,0,0.6), 0 0 24px rgba(93,212,184,0.18)`
+                        : "none",
+                      zIndex: isDragging ? 10 : 1,
+                      position: "relative",
+                      transition: rankDragValue
+                        ? "transform 0.15s ease, box-shadow 0.15s ease, border-color 0.1s, background 0.1s"
+                        : "all 0.22s ease",
+                    }}
+                  >
+                    {/* Number badge */}
+                    <div style={{
+                      width: 42, height: 42, borderRadius: 14, flexShrink: 0,
+                      background: isFirst ? "rgba(212,168,71,0.18)" : isDragging ? "rgba(93,212,184,0.2)" : "rgba(255,255,255,0.06)",
+                      border: isFirst ? `1px solid rgba(212,168,71,0.4)` : isDragging ? `1px solid rgba(93,212,184,0.4)` : "1px solid rgba(255,255,255,0.08)",
+                      display: "flex", alignItems: "center", justifyContent: "center",
+                      fontWeight: 700, fontSize: 15,
+                      color: isFirst ? C.gold : isDragging ? C.teal : C.textMuted,
+                    }}>
+                      {idx + 1}
+                    </div>
+
+                    {/* Drag handle */}
+                    <div style={{ fontSize: 18, color: isDragging ? C.teal : "rgba(255,255,255,0.18)", letterSpacing: "1px", flexShrink: 0 }}>⠿</div>
+
+                    {/* Value name */}
+                    <div style={{ flex: 1, fontSize: 17, fontWeight: 600, color: isFirst ? C.gold : C.textPrimary }}>
+                      {value}
+                    </div>
+
+                    {isFirst && !rankDragValue && (
+                      <div style={{ fontSize: 10, color: C.gold, fontWeight: 700, letterSpacing: "0.14em", textTransform: "uppercase", flexShrink: 0 }}>
+                        Top value
+                      </div>
+                    )}
                   </div>
-                  <div style={{ fontSize: 16, color: C.textMuted }}>⋮⋮</div>
-                  <div style={{ flex: 1, fontSize: 16, fontWeight: 600 }}>{value}</div>
-                  <div style={{ display: "flex", gap: 7 }}>
-                    <Btn ghost disabled={idx === 0} onClick={() => moveRank(idx, "up")} style={{ padding: "6px 10px", fontSize: 13 }}>↑</Btn>
-                    <Btn ghost disabled={idx === orderedTopTen.length - 1} onClick={() => moveRank(idx, "down")} style={{ padding: "6px 10px", fontSize: 13 }}>↓</Btn>
-                  </div>
-                </div>
-              ))}
+                );
+              })}
             </div>
-            <div style={{ marginTop: 24 }}>
+            <div style={{ marginTop: 26 }}>
               <Btn onClick={() => setStage(STAGES.narrativeIntro)}>See my final reflection</Btn>
             </div>
           </StageCard>
