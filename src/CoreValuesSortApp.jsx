@@ -10,6 +10,7 @@ const ALL_VALUES = [
 ];
 
 const STAGES = {
+  welcome: "welcome",
   intro: "intro",
   sort: "sort",
   halftime: "halftime",
@@ -307,7 +308,7 @@ function DotLoader({ label = "Creating your statement…" }) {
 // ─── MAIN APP ─────────────────────────────────────────────────────────────────
 export default function CoreValuesSortApp() {
   const [name, setName] = useState("");
-  const [stage, setStage] = useState(STAGES.intro);
+  const [stage, setStage] = useState(STAGES.welcome);
   const [deck, setDeck] = useState(() => shuffleArray(ALL_VALUES));
   const [sortIndex, setSortIndex] = useState(0);
   const [havePile, setHavePile] = useState([]);
@@ -456,7 +457,7 @@ export default function CoreValuesSortApp() {
     setAiNarrative("");
     setGenError("");
     setGenerating(false);
-    setStage(STAGES.intro);
+    setStage(STAGES.welcome);
   }
 
   // ── Hidden developer mode: tap header label 5 times to toggle ─────────────
@@ -600,8 +601,8 @@ export default function CoreValuesSortApp() {
 
   // ── RENDER ─────────────────────────────────────────────────────────────────
   return (
-    <div style={{ minHeight: "100vh", padding: "22px 20px 70px" }}>
-      <div style={{ maxWidth: 1180, margin: "0 auto" }}>
+    <div style={{ minHeight: "100vh", padding: "40px 20px", display: "flex", flexDirection: "column", justifyContent: "center" }}>
+      <div style={{ maxWidth: 1180, width: "100%", margin: "0 auto" }}>
 
         {/* ── HEADER ─────────────────────────────────────────────────────────── */}
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 16, marginBottom: 30, flexWrap: "wrap" }}>
@@ -623,8 +624,50 @@ export default function CoreValuesSortApp() {
               </div>
             )}
           </div>
-          <Btn ghost onClick={resetAll}>Start over</Btn>
+          {stage !== STAGES.welcome && <Btn ghost onClick={resetAll}>Start over</Btn>}
         </div>
+
+        {/* ════════════════ WELCOME ════════════════════════════════════════════ */}
+        {stage === STAGES.welcome && (
+          <StageCard wide>
+            <div style={{ textAlign: "center", padding: "14px 0 40px" }}>
+              <h2 style={{ margin: "0 0 18px",
+                Know what you stand for.
+              </h2>
+              <p style={{ margin: "0 auto", maxWidth: 520, fontSize: 17, lineHeight: 1.9, color: C.textSecondary }}>
+                Most people have a rough sense of what they value.
+                Fewer have ever stopped to look at it directly.
+                This exercise helps you close that gap.
+              </p>
+            </div>
+
+            <div className="cv-grid" style={{ gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))", marginBottom: 36 }}>
+              {[
+                { label: "Not goals.", body: "Goals are things you reach. Values are things you live by — quietly, constantly, whether you're paying attention or not." },
+                { label: "Not rules.", body: "Values aren't instructions handed to you from outside. They're a description of what's already true about who you are." },
+                { label: "Yours alone.", body: "No one builds this list for you. The choices you make here — and the order you place them in — come entirely from you." },
+              ].map(({ label, body }) => (
+                <div key={label} style={{ border: `1px solid ${C.cardBorder}`, background: "rgba(255,255,255,0.025)", borderRadius: 22, padding: "24px 22px" }}>
+                  <div style={{ fontSize: 16, fontWeight: 700, color: C.gold, marginBottom: 10 }}>{label}</div>
+                  <div style={{ fontSize: 14, lineHeight: 1.85, color: C.textSecondary }}>{body}</div>
+                </div>
+              ))}
+            </div>
+
+            <div style={{ border: `1px solid ${C.tealBorder}`, background: C.tealBg, borderRadius: 18, padding: "20px 24px", marginBottom: 36 }}>
+              <div style={{ fontSize: 11, fontWeight: 600, letterSpacing: "0.14em", textTransform: "uppercase", color: C.teal, marginBottom: 10 }}>What you'll do</div>
+              <div style={{ fontSize: 15, lineHeight: 1.85, color: C.textSecondary }}>
+                You'll move through a full list of values one at a time — keeping what resonates, setting the rest aside. You'll narrow them down until ten remain, rank them in your own order, and finish with a personal statement about what you stand for.
+              </div>
+            </div>
+
+            <div style={{ textAlign: "center" }}>
+              <Btn onClick={() => setStage(STAGES.intro)} style={{ padding: "15px 40px", fontSize: 16 }}>
+                I'm ready →
+              </Btn>
+            </div>
+          </StageCard>
+        )}
 
         {/* ════════════════ INTRO ══════════════════════════════════════════════ */}
         {stage === STAGES.intro && (
