@@ -33,7 +33,8 @@ function shuffleArray(arr) {
 }
 
 // ─── AI ───────────────────────────────────────────────────────────────────────
-async function generateAINarrative(name, values, apiKey) {
+async function generateAINarrative(name, values) {
+  const apiKey = import.meta.env.VITE_GROQ_KEY;
   const valuesText = values.map((v, i) => `${i + 1}. ${v}`).join("\n");
   const prompt = `You are writing a heartfelt first-person narrative statement for someone named ${name} who has just completed a meaningful self-reflection exercise about their core values. They are on a personal journey of growth and recovery.
 
@@ -46,14 +47,14 @@ Then naturally weave through all 10 values — not listing them robotically, but
 
 About 200–240 words. No bullet points, no headers — just flowing first-person prose.`;
 
-  const res = await fetch("https://api.openai.com/v1/chat/completions", {
+  const res = await fetch("https://api.groq.com/openai/v1/chat/completions", {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
       Authorization: `Bearer ${apiKey}`,
     },
     body: JSON.stringify({
-      model: "gpt-4o-mini",
+      model: "llama-3.3-70b-versatile",
       messages: [{ role: "user", content: prompt }],
       temperature: 0.72,
       max_tokens: 600,
@@ -318,7 +319,6 @@ export default function CoreValuesSortApp() {
   const [tapCount, setTapCount] = useState(0);
 
   // AI narrative state
-  const [apiKey, setApiKey] = useState(() => localStorage.getItem("cv_oai_key") || "");
   const [aiNarrative, setAiNarrative] = useState("");
   const [generating, setGenerating] = useState(false);
   const [genError, setGenError] = useState("");
@@ -396,13 +396,14 @@ export default function CoreValuesSortApp() {
     setGenError("");
     setAiNarrative("");
 
-    if (!apiKey.trim()) {
+    const hasKey = !!import.meta.env.VITE_GROQ_KEY;
+    if (!hasKey) {
       setAiNarrative(buildFallbackNarrative(name, orderedTopTen));
       return;
     }
 
     setGenerating(true);
-    generateAINarrative(name, orderedTopTen, apiKey)
+    generateAINarrative(name, orderedTopTen)
       .then((narrative) => {
         if (!cancelled) {
           setAiNarrative(narrative);
@@ -616,19 +617,6 @@ export default function CoreValuesSortApp() {
               <input value={name} onChange={(e) => setName(e.target.value)} placeholder="Type your name" />
             </div>
 
-            {/* API key — always visible */}
-            <div style={{ marginBottom: 4 }}>
-              <label style={labelStyle}>OpenAI API key <span style={{ color: C.textMuted, fontWeight: 400, textTransform: "none", letterSpacing: 0 }}>(for AI-written narrative)</span></label>
-              <input
-                type="password"
-                value={apiKey}
-                onChange={(e) => setApiKey(e.target.value)}
-                placeholder="sk-… (leave blank for template)"
-              />
-              <div style={{ fontSize: 12, color: C.textMuted, marginTop: 6, lineHeight: 1.5 }}>
-                Saved in this browser. The AI uses your top 10 values to write a personalized first-person statement.
-              </div>
-            </div>
 
             <div style={{ ...hintBox, marginTop: 22 }}>
               Go one card at a time — sort each value into{" "}
