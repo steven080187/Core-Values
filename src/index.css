@@ -2,3 +2,30 @@
 *, *::before, *::after { box-sizing: border-box; }
 body { margin: 0; min-height: 100vh; min-width: 320px; }
 #root { min-height: 100vh; }
+
+/* ─────────────────────────────────────────
+   Mobile scaling fix
+   Makes the interface fit phones better
+   without changing desktop layout
+───────────────────────────────────────── */
+
+@media (max-width: 700px) {
+
+  #root > div {
+    padding: 20px 12px !important;
+  }
+
+  h1 {
+    font-size: 24px !important;
+    line-height: 1.2 !important;
+  }
+
+  h2 {
+    font-size: 28px !important;
+  }
+
+  p {
+    font-size: 15px !important;
+  }
+
+}
