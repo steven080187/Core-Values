@@ -323,24 +323,6 @@ function DotLoader({ label = "Creating your statement…" }) {
 
 // ─── MAIN APP ─────────────────────────────────────────────────────────────────
 export default function CoreValuesSortApp() {
-  async function uploadTextFile() {
-  const text = "hello from my app";
-  const base64 = btoa(unescape(encodeURIComponent(text)));
-
-  const res = await fetch('/api/upload', {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-    },
-    body: JSON.stringify({
-      filename: 'reflection.txt',
-      content: base64,
-    }),
-  });
-
-  const data = await res.json();
-  alert(data.url || data.error);
-}
   const [name, setName] = useState("");
   const [stage, setStage] = useState(STAGES.welcome);
   const [deck, setDeck] = useState(() => shuffleArray(ALL_VALUES));
