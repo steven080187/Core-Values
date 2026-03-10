@@ -336,11 +336,6 @@ export default function CoreValuesSortApp() {
   const processReflection = buildProcessReflection(name);
   const displayRankOrder = rankLiveOrder ?? orderedTopTen;
 
-  // Persist API key
-  useEffect(() => {
-    if (apiKey) localStorage.setItem("cv_oai_key", apiKey);
-  }, [apiKey]);
-
   // Inject global styles once
   useEffect(() => {
     const id = "cv-global-style";
