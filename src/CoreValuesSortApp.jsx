@@ -328,6 +328,10 @@ export default function CoreValuesSortApp() {
   const [rankLiveOrder, setRankLiveOrder] = useState(null);
   const rankLiveOrderRef = useRef(null);
 
+  // Background music
+  const audioRef = useRef(null);
+  const audioStartedRef = useRef(false);
+
   // Derived
   const currentValue = deck[sortIndex];
   const sortProgress = Math.round((sortIndex / deck.length) * 100);
@@ -335,6 +339,29 @@ export default function CoreValuesSortApp() {
   const canStart = name.trim() !== "";
   const processReflection = buildProcessReflection(name);
   const displayRankOrder = rankLiveOrder ?? orderedTopTen;
+
+  // Start background music on first user interaction (satisfies browser autoplay policy)
+  useEffect(() => {
+    const audio = new Audio('/music/cosmic-contemplation.mp3');
+    audio.loop = true;
+    audio.volume = 0.35;
+    audioRef.current = audio;
+
+    function tryStart() {
+      if (audioStartedRef.current) return;
+      audioStartedRef.current = true;
+      audio.play().catch(() => {});
+      document.removeEventListener('pointerdown', tryStart);
+    }
+
+    document.addEventListener('pointerdown', tryStart);
+
+    return () => {
+      document.removeEventListener('pointerdown', tryStart);
+      audio.pause();
+      audio.src = '';
+    };
+  }, []);
 
   // Inject global styles once
   useEffect(() => {
