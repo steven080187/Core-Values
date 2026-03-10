@@ -258,7 +258,6 @@ function Btn({ children, onClick, disabled = false, ghost = false, style = {} })
     >
       {children}
     </button>
-    <button onClick={uploadTextFile}>Upload Test File</button>
   );
 }
 
