@@ -334,6 +334,11 @@ export default function CoreValuesSortApp() {
   const [orderedTopTen, setOrderedTopTen] = useState([]);
   const [counselorMode, setCounselorMode] = useState(false);
   const [tapCount, setTapCount] = useState(0);
+  const [ownerTapCount, setOwnerTapCount] = useState(0);
+  const [ownerUnlocked, setOwnerUnlocked] = useState(false);
+  const [ownerError, setOwnerError] = useState("");
+  const [quickValues, setQuickValues] = useState(() => Array.from({ length: 10 }, () => ""));
+  const [quickError, setQuickError] = useState("");
 
   // AI narrative state
   const [aiNarrative, setAiNarrative] = useState("");
@@ -354,6 +359,7 @@ export default function CoreValuesSortApp() {
   const sortProgress = Math.round((sortIndex / deck.length) * 100);
   const halfTarget = Math.max(1, Math.ceil(havePile.length / 2));
   const canStart = name.trim() !== "";
+  const canQuickGenerate = name.trim() !== "" && quickValues.every((v) => v.trim() !== "");
   const processReflection = buildProcessReflection(name);
   const displayRankOrder = rankLiveOrder ?? orderedTopTen;
 
@@ -473,6 +479,8 @@ export default function CoreValuesSortApp() {
     setAiNarrative("");
     setGenError("");
     setGenerating(false);
+    setQuickValues(Array.from({ length: 10 }, () => ""));
+    setQuickError("");
     setStage(STAGES.welcome);
   }
 
@@ -485,6 +493,55 @@ export default function CoreValuesSortApp() {
       return;
     }
     setTapCount(next);
+  }
+
+  function requestOwnerAccess() {
+    const expected = import.meta.env.VITE_OWNER_ACCESS_KEY;
+    if (!expected) {
+      setOwnerError("Owner access key is not configured.");
+      return;
+    }
+    const entered = window.prompt("Owner access key");
+    if (!entered) return;
+    if (entered === expected) {
+      setOwnerUnlocked(true);
+      setOwnerError("");
+      return;
+    }
+    setOwnerError("Invalid access key.");
+  }
+
+  // Hidden owner unlock: tap the intro title 7 times, then enter owner key.
+  function handleOwnerSecretTap() {
+    const next = ownerTapCount + 1;
+    if (next >= 7) {
+      setOwnerTapCount(0);
+      requestOwnerAccess();
+      return;
+    }
+    setOwnerTapCount(next);
+  }
+
+  function updateQuickValue(index, nextValue) {
+    setQuickValues((prev) => prev.map((v, i) => (i === index ? nextValue : v)));
+  }
+
+  function runOwnerQuickFlow() {
+    const cleaned = quickValues.map((v) => v.trim());
+    if (cleaned.some((v) => !v)) {
+      setQuickError("Enter all 10 values.");
+      return;
+    }
+    if (new Set(cleaned.map((v) => v.toLowerCase())).size !== 10) {
+      setQuickError("Use 10 unique values.");
+      return;
+    }
+    setQuickError("");
+    setHavePile(cleaned);
+    setHalfSelections(cleaned);
+    setTopTenSelections(cleaned);
+    setOrderedTopTen(cleaned);
+    setStage(STAGES.narrativeIntro);
   }
 
   function choosePile(which) {
@@ -681,7 +738,7 @@ export default function CoreValuesSortApp() {
         {/* ════════════════ INTRO ══════════════════════════════════════════════ */}
         {stage === STAGES.intro && (
           <StageCard>
-            <div style={{ fontSize: 26, fontWeight: 700, marginBottom: 6 }}>Before we begin</div>
+            <div onClick={handleOwnerSecretTap} style={{ fontSize: 26, fontWeight: 700, marginBottom: 6 }}>Before we begin</div>
             <div style={{ color: C.textSecondary, fontSize: 16, marginBottom: 24, lineHeight: 1.75 }}>
               Enter your name, then begin the exercise.
             </div>
@@ -710,6 +767,38 @@ export default function CoreValuesSortApp() {
                 </>
               )}
             </div>
+            {ownerError && (
+              <div style={{ marginTop: 10, color: "#f87171", fontSize: 12 }}>{ownerError}</div>
+            )}
+
+            {ownerUnlocked && (
+              <div style={{ ...hintBox, marginTop: 20 }}>
+                <div style={{ fontSize: 12, textTransform: "uppercase", letterSpacing: "0.1em", color: C.gold, marginBottom: 10, fontWeight: 700 }}>
+                  Owner quick generate
+                </div>
+                <div style={{ color: C.textSecondary, marginBottom: 12, fontSize: 14 }}>
+                  Enter 10 ranked values and jump directly to the same AI final reflection.
+                </div>
+                <div className="cv-grid cv-two" style={{ gridTemplateColumns: "1fr 1fr", gap: 10 }}>
+                  {quickValues.map((value, idx) => (
+                    <input
+                      key={idx}
+                      value={value}
+                      onChange={(e) => updateQuickValue(idx, e.target.value)}
+                      placeholder={`#${idx + 1} value`}
+                    />
+                  ))}
+                </div>
+                <div style={{ display: "flex", gap: 10, marginTop: 14, flexWrap: "wrap" }}>
+                  <Btn disabled={!canQuickGenerate} onClick={runOwnerQuickFlow}>
+                    Generate from 10 values
+                  </Btn>
+                </div>
+                {quickError && (
+                  <div style={{ marginTop: 10, color: "#f87171", fontSize: 12 }}>{quickError}</div>
+                )}
+              </div>
+            )}
           </StageCard>
         )}
 
