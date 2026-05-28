@@ -334,6 +334,7 @@ export default function CoreValuesSortApp() {
   const [orderedTopTen, setOrderedTopTen] = useState([]);
   const [counselorMode, setCounselorMode] = useState(false);
   const [tapCount, setTapCount] = useState(0);
+  const [ownerTapCount, setOwnerTapCount] = useState(0);
   const [ownerUnlocked, setOwnerUnlocked] = useState(false);
   const [ownerError, setOwnerError] = useState("");
   const [quickValues, setQuickValues] = useState(() => Array.from({ length: 10 }, () => ""));
@@ -508,6 +509,17 @@ export default function CoreValuesSortApp() {
       return;
     }
     setOwnerError("Invalid access key.");
+  }
+
+  // Hidden owner unlock: tap the intro title 7 times, then enter owner key.
+  function handleOwnerSecretTap() {
+    const next = ownerTapCount + 1;
+    if (next >= 7) {
+      setOwnerTapCount(0);
+      requestOwnerAccess();
+      return;
+    }
+    setOwnerTapCount(next);
   }
 
   function updateQuickValue(index, nextValue) {
@@ -726,7 +738,7 @@ export default function CoreValuesSortApp() {
         {/* ════════════════ INTRO ══════════════════════════════════════════════ */}
         {stage === STAGES.intro && (
           <StageCard>
-            <div style={{ fontSize: 26, fontWeight: 700, marginBottom: 6 }}>Before we begin</div>
+            <div onClick={handleOwnerSecretTap} style={{ fontSize: 26, fontWeight: 700, marginBottom: 6 }}>Before we begin</div>
             <div style={{ color: C.textSecondary, fontSize: 16, marginBottom: 24, lineHeight: 1.75 }}>
               Enter your name, then begin the exercise.
             </div>
@@ -747,13 +759,6 @@ export default function CoreValuesSortApp() {
               <Btn disabled={!canStart} onClick={() => setStage(STAGES.sort)}>
                 Begin the exercise
               </Btn>
-              {!ownerUnlocked ? (
-                <Btn ghost onClick={requestOwnerAccess}>Owner unlock</Btn>
-              ) : (
-                <div style={{ color: C.gold, fontSize: 13, display: "flex", alignItems: "center" }}>
-                  Owner tools unlocked
-                </div>
-              )}
               {counselorMode && (
                 <>
                   <Btn ghost onClick={skipToHalf}>Skip → half</Btn>
